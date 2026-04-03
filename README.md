@@ -1,3 +1,5 @@
+> **Note:** This is a fork of [snyk-labs/nodejs-goof](https://github.com/snyk-labs/nodejs-goof) used for a demo in Secure Software Applications.
+
 # Goof - Snyk's vulnerable demo app
 [![Known Vulnerabilities](https://snyk.io/test/github/snyk/goof/badge.svg?style=flat-square)](https://snyk.io/test/github/snyk/goof)
 
