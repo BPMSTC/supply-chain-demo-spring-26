@@ -52,7 +52,7 @@ jobs:
       # Upload SARIF results to GitHub Code Scanning / Security tab
       # This integrates Snyk findings with GitHub's native security features
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk.sarif
 
