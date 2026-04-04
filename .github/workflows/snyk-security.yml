@@ -1,0 +1,69 @@
+# File: .github/workflows/snyk-security.yml
+name: Snyk Security Scan
+
+# Trigger: Run on every push to main and on PRs targeting main
+# This ensures all code is scanned before merge
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Optional: Run daily at 2 AM UTC to catch newly disclosed vulnerabilities
+  schedule:
+    - cron: '0 2 * * *'
+
+# Prevent duplicate runs for PRs from the same repo
+concurrency:
+  group: snyk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  security-events: write   # Required to upload SARIF to GitHub Security tab
+  contents: read            # Required to checkout the repo
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout code - required so Snyk can access package.json / lock files
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Run Snyk to check for vulnerabilities
+      # The snyk/actions/node action automatically installs Node.js and
+      # runs npm install, so no separate setup-node or npm ci steps are needed.
+      #
+      # SNYK_TOKEN must be set as a GitHub Actions secret.
+      # --severity-threshold=high: Only report high/critical severity issues
+      # --sarif-file-output: Generate SARIF for GitHub Security tab upload
+      #
+      # continue-on-error is required because Snyk exits non-zero when it
+      # finds vulnerabilities, which would prevent the SARIF upload step
+      # from running.
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif
+
+      # Upload SARIF results to GitHub Code Scanning / Security tab
+      # This integrates Snyk findings with GitHub's native security features
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif
+
+      # Monitor project in Snyk platform for ongoing alerts
+      # This creates a persistent snapshot so Snyk can notify you
+      # when new vulnerabilities are disclosed against your dependencies.
+      # Only runs on push to main (not on PRs or scheduled runs).
+      - name: Monitor project with Snyk
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: monitor
