@@ -18,7 +18,6 @@ mongoose.model('User', User);
 
 // CloudFoundry env vars
 var mongoCFUri = cfenv.getAppEnv().getServiceURL('goof-mongo');
-console.log(JSON.stringify(cfenv.getAppEnv()));
 
 // Default Mongo URI is local
 const DOCKER = process.env.DOCKER
@@ -43,6 +42,7 @@ if (mongoCFUri) {
 console.log("Using Mongo URI " + mongoUri);
 
 mongoose.connect(mongoUri);
+mongoose.connection.on('error', function(err) { console.error('MongoDB connection error:', err); });
 
 User = mongoose.model('User');
 User.find({ username: 'admin@snyk.io' }).exec(function (err, users) {

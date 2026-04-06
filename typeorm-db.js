@@ -12,7 +12,7 @@ typeorm.createConnection({
   password: "root",
   database: "acme",
   synchronize: true,
-  "logging": true,
+  "logging": false,
   entities: [
     new EntitySchema(Users)
   ]
