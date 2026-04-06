@@ -1,24 +1,41 @@
+// Utility helpers (custom app utilities)
 var utils = require('../utils');
+
+// Mongoose ODM and data models for MongoDB
 var mongoose = require('mongoose');
-var Todo = mongoose.model('Todo');
-var User = mongoose.model('User');
-// TODO:
-var hms = require('humanize-ms');
-var ms = require('ms');
+var Todo = mongoose.model('Todo');   // Todo item model
+var User = mongoose.model('User');   // User/admin model
+
+// Time parsing libraries used in the todo reminder feature
+var hms = require('humanize-ms');   // Parses human-readable durations like "2 hours" → ms
+var ms = require('ms');             // Converts milliseconds to readable strings
+
+// Stream utilities (imported but not actively used in this file)
 var streamBuffers = require('stream-buffers');
 var readline = require('readline');
+
+// Date/time formatting library
+// VULNERABILITY: moment is an outdated dependency with known CVEs
 var moment = require('moment');
+
+// VULNERABILITY (Shell Injection): exec runs shell commands — unsanitized user
+// input passed to exec() in exports.create allows remote command execution
 var exec = require('child_process').exec;
+
+// Input validation library used on email, phone, and text fields
 var validator = require('validator');
 
-// zip-slip
+// VULNERABILITY (Zip Slip): AdmZip extracts archives without validating paths,
+// allowing a crafted ZIP to write files outside the intended extraction directory
 var fileType = require('file-type');
 var AdmZip = require('adm-zip');
 var fs = require('fs');
 
-// prototype-pollution
+// VULNERABILITY (Prototype Pollution): lodash _.merge() with unsanitized user
+// input can overwrite Object.prototype properties, affecting all objects
 var _ = require('lodash');
 
+// GET / — Fetches all todos sorted by most recently updated and renders the index view
 exports.index = function (req, res, next) {
   Todo.
     find({}).
@@ -34,11 +51,15 @@ exports.index = function (req, res, next) {
     });
 };
 
+// POST /login — Authenticates a user against the database.
+// VULNERABILITY: Passwords are stored and compared in plaintext (no hashing).
+// VULNERABILITY: No brute-force protection or rate limiting.
 exports.loginHandler = function (req, res, next) {
+  // Basic email format validation before querying the database
   if (validator.isEmail(req.body.username)) {
     User.find({ username: req.body.username, password: req.body.password }, function (err, users) {
       if (users.length > 0) {
-        const redirectPage = req.body.redirectPage
+        const redirectPage = req.body.redirectPage  // VULNERABILITY: user-controlled redirect (open redirect)
         const session = req.session
         const username = req.body.username
         return adminLoginSuccess(redirectPage, session, username, res)
@@ -51,6 +72,9 @@ exports.loginHandler = function (req, res, next) {
   }
 };
 
+// Helper: sets session as logged in and redirects to the target page.
+// VULNERABILITY (Open Redirect): redirectPage comes from user input and is not
+// validated, so an attacker can redirect to any external URL after login.
 function adminLoginSuccess(redirectPage, session, username, res) {
   session.loggedIn = 1
 
@@ -64,14 +88,16 @@ function adminLoginSuccess(redirectPage, session, username, res) {
   }
 }
 
+// GET /login — Renders the admin login form
 exports.login = function (req, res, next) {
   return res.render('admin', {
     title: 'Admin Access',
     granted: false,
-    redirectPage: req.query.redirectPage
+    redirectPage: req.query.redirectPage  // VULNERABILITY: reflected open redirect param
   });
 };
 
+// GET /admin — Renders the admin dashboard (access controlled by isLoggedIn middleware)
 exports.admin = function (req, res, next) {
   return res.render('admin', {
     title: 'Admin Access Granted',
@@ -79,6 +105,7 @@ exports.admin = function (req, res, next) {
   });
 };
 
+// GET /account — Renders the account details page (currently no DB lookup implemented)
 exports.get_account_details = function(req, res, next) {
   // @TODO need to add a database call to get the profile from the database
   // and provide it to the view to display
@@ -86,6 +113,7 @@ exports.get_account_details = function(req, res, next) {
  	return res.render('account.hbs', profile)
 }
 
+// POST /account — Saves and validates account details submitted from the form
 exports.save_account_details = function(req, res, next) {
   // get the profile details from the JSON
 	const profile = req.body
@@ -112,6 +140,7 @@ exports.save_account_details = function(req, res, next) {
   }
 }
 
+// Middleware: checks if the user has an active session. Used to protect admin routes.
 exports.isLoggedIn = function (req, res, next) {
   if (req.session.loggedIn === 1) {
     return next()
@@ -120,6 +149,7 @@ exports.isLoggedIn = function (req, res, next) {
   }
 }
 
+// GET /logout — Destroys the session and redirects to home
 exports.logout = function (req, res, next) {
   req.session.loggedIn = 0
   req.session.destroy(function() { 
